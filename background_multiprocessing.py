@@ -38,9 +38,8 @@ def process_chunk(chunk: list, passed: list, DD: ndarray) -> Tuple[list, int]:
             oopsies += 1
             continue
 
-        flag = len(AA) == 16
 
-        if flag:
+        if len(AA) == 16:
             for jj in range(1, 9):
                 select = 2 * (jj - 1) + 1 if PID > 0 else 2 * jj
                 layer = AA[select - 1][0]
