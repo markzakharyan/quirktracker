@@ -42,9 +42,6 @@ def process(passed: list, inputPath: str, outputPath: str) -> None:
         if EventID not in passed:
             continue
 
-        if EventID > 240:
-            break
-
         try:
             AA = RunPoint(vecs[0], vecs[1], 20, False, False)
         except:
