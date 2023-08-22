@@ -5,7 +5,6 @@ import os
 from joblib import Parallel, delayed
 from typing import List, Tuple
 
-Lambda = 20
 
 def process_event_batch(event_ids: List[int], DDA: ndarray, DDP: ndarray, Lambda: float) -> Tuple[List[List], List[int]]:
     """
@@ -31,8 +30,8 @@ def process_event_batch(event_ids: List[int], DDA: ndarray, DDP: ndarray, Lambda
     for EventID in event_ids:
         vecs = [DDA[EventID], DDP[EventID]]
         AA = RunPoint(vecs[0], vecs[1], Lambda, False, True)
-        flag = len(AA) == 16
-        if flag:
+
+        if len(AA) == 16:
             passed.append(EventID+1)
             for jj in range(16):
                 layer = AA[jj][0] - 1
@@ -45,7 +44,7 @@ def process_event_batch(event_ids: List[int], DDA: ndarray, DDP: ndarray, Lambda
     return data, passed
 
 
-def process() -> List[int]:
+def process(Lambda, inputPathP, inputPathA, outputPath) -> List[int]:
     """
     Process particle data from two CSV files, generate hit points for each particle using the RunPoint function, 
     and save the processed data to a new CSV file. 
@@ -62,16 +61,11 @@ def process() -> List[int]:
     - The output file is saved in the "HitFiles" directory and is named according to the mass and Lambda value.
     """
 
-    pid = 15
-    mass = 500
-
-    current_directory = os.getcwd()
-    readfileP = f"{current_directory}/4vector_{mass}GeV_PID{pid}_1jet.csv"
-    readfileA = f"{current_directory}/4vector_{mass}GeV_PID{-pid}_1jet.csv"
+    start_time = time.time()
 
     # Reading data
-    DDP = pd.read_csv(readfileP).to_numpy()
-    DDA = pd.read_csv(readfileA).to_numpy()
+    DDP = pd.read_csv(inputPathP).to_numpy()
+    DDA = pd.read_csv(inputPathA).to_numpy()
 
     # keep only first 4 columns of ddp and dda
     DDP = DDP[:, :4]
@@ -95,14 +89,13 @@ def process() -> List[int]:
         passed.extend(chunk_passed)
     
 
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles")
-
-    os.makedirs(path, exist_ok=True)
-
-    path = os.path.join(path, f"QuirkMass_{mass}_Lambda_{Lambda}_multiprocessed.csv")
+    
 
     df = pd.DataFrame(data[1:], columns=data[0])
-    df.to_csv(path, index=False)
+    df.to_csv(outputPath, index=False)
+
+    print(f"(Quirk Multiprocessed) Time taken: {time.time() - start_time} seconds")
+
 
     return passed
 
@@ -113,6 +106,19 @@ if __name__ == '__main__':
     The script processes particle data from two input CSV files, generates hit points for each particle event, 
     and saves the processed data to a new CSV file.
     """
-    start_time = time.time()
-    process()
-    print(f"(Quirk Multiprocessed) Time taken: {time.time() - start_time} seconds")
+
+    Lambda = 20
+    pid = 15
+    mass = 500
+
+    current_directory = os.getcwd()
+    inputPathP = f"{current_directory}/4vector_{mass}GeV_PID{pid}_1jet.csv"
+    inputPathA = f"{current_directory}/4vector_{mass}GeV_PID{-pid}_1jet.csv"
+
+    outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles")
+    os.makedirs(outputPath, exist_ok=True)
+    outputPath = os.path.join(outputPath, f"QuirkMass_{mass}_Lambda_{Lambda}_multiprocessed.csv")
+
+
+    passed = process(Lambda, inputPathP, inputPathA, outputPath)
+    print(f"passed: {passed}")

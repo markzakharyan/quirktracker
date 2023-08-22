@@ -4,16 +4,16 @@ import pandas as pd
 from knappen import *
 from joblib import Parallel, delayed
 
-current_directory = os.getcwd()
-readfileB = f"{current_directory}/4vector_pionbgd_wCuts.csv"
-DD = pd.read_csv(readfileB).to_numpy()
 
-def process_chunk(chunk: list, passed: list) -> Tuple[list, int]:
+
+def process_chunk(chunk: list, passed: list, DD: ndarray) -> Tuple[list, int]:
     """
     Process a chunk of the data, generating the required data list and counting any errors.
 
     Parameters:
     - chunk (list): A list of indices representing rows of the data to be processed.
+    - passed (list): A list of EventID values
+    - DD (ndarray): The data to be processed.
 
     Returns:
     - list: A list containing the processed data.
@@ -57,7 +57,7 @@ def process_chunk(chunk: list, passed: list) -> Tuple[list, int]:
 
     return data, oopsies
 
-def process(passed: list) -> None:
+def process(passed: list, inputPath: str, outputPath: str) -> None:
     """
     Processes a dataset in parallel, filtering and extracting relevant information 
     based on the provided list of passed events. The extracted data is then saved 
@@ -66,6 +66,8 @@ def process(passed: list) -> None:
     Parameters:
     - passed (list): A list of EventID values that have been pre-approved or filtered. 
                      Only rows in the dataset with an EventID in this list will be processed.
+    - inputPath (str): The path to the CSV file containing the data to be processed.
+    - outputPath (str): The path to the CSV file to save the processed data to.
 
     Outputs:
     - A CSV file named "Bgd_500_1jet_wCuts_multiprocessed.csv" in the "HitFiles/Bgd" directory, 
@@ -77,12 +79,16 @@ def process(passed: list) -> None:
     - After processing, the function prints the total number of problematic executions 
       (represented by the "oopsies" count) encountered during the parallel processing.
     """
+    start_time = time.time()
+
+    
+    DD = pd.read_csv(inputPath).to_numpy()
     
     indices = list(range(1, min(88860, len(DD))))
     chunk_size = len(indices) // os.cpu_count()
     chunks = [indices[i:i+chunk_size] for i in range(0, len(indices), chunk_size)]
 
-    results = Parallel(n_jobs=os.cpu_count())(delayed(process_chunk)(chunk, passed) for chunk in chunks)
+    results = Parallel(n_jobs=os.cpu_count())(delayed(process_chunk)(chunk, passed, DD) for chunk in chunks)
 
 
     # Combine results from all processes
@@ -94,11 +100,13 @@ def process(passed: list) -> None:
 
     print(f"There were {total_oopsies} problem RunPoint executions.")
 
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", "Bgd")
-    os.makedirs(path, exist_ok=True)
-    path = os.path.join(path, "Bgd_500_1jet_wCuts_multiprocessed.csv")
+    
     df = pd.DataFrame(all_data[1:], columns=all_data[0])
-    df.to_csv(path, index=False)
+    df.to_csv(outputPath, index=False)
+
+    print(f"(Background Multiprocessed) Time taken: {time.time() - start_time} seconds")
+
+
 
 
 
@@ -111,9 +119,15 @@ if __name__ == "__main__":
     """
 
     passed = [3, 4, 10, 14, 15, 19, 20, 21, 26, 31, 32, 33, 40, 41, 43, 47, 50, 51, 52, 55, 56, 57, 58, 59, 61, 66, 67, 68, 69, 70, 79, 81, 82, 83, 87, 88, 94, 95, 98, 100, 103, 104, 105, 111, 113, 114, 116, 117, 118, 119, 127, 128, 131, 134, 136, 139, 140, 141, 142, 143, 144, 150, 152, 154, 155, 165, 166, 171, 173, 174, 176, 177, 178, 180, 181, 184, 186, 187, 188, 189, 192, 194, 195, 197, 198, 199, 203, 205, 208, 211, 212, 220, 222, 224, 228, 229, 234, 236, 237, 240]
-    start_time = time.time()
-    process(passed)
-    end_time = time.time()
-    print(f"(Background Multiprocessed) Time taken: {end_time - start_time} seconds")
+
+
+    current_directory = os.getcwd()
+    inputPath = f"{current_directory}/4vector_pionbgd_wCuts.csv"
+
+    outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", "Bgd")
+    os.makedirs(outputPath, exist_ok=True)
+    outputPath = os.path.join(outputPath, "Bgd_500_1jet_wCuts_multiprocessed.csv")
+
+    process(passed, inputPath, outputPath)
 
     

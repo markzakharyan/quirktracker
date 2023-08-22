@@ -3,13 +3,16 @@ from knappen import *
 import pandas as pd
 import os
 
-def process() -> list:
+def process(Lambda, inputPathP, inputPathA, outputPath) -> list:
     """
     Process particle data from two CSV files, generate hit points for each particle using the RunPoint function, 
     and save the processed data to a new CSV file. 
 
     Parameters:
-    None
+    - Lambda (float): The 'quirk tension' value used for processing.
+    - inputPathP (str): The path to the CSV file containing the data for particles with PID 15.
+    - inputPathA (str): The path to the CSV file containing the data for particles with PID -15.
+    - outputPath (str): The path to the CSV file to save the processed data to.
 
     Returns:
     - list: A list of Event IDs that passed the processing conditions.
@@ -20,16 +23,11 @@ def process() -> list:
     - The output file is saved in the "HitFiles" directory and is named according to the mass and Lambda value.
     """
 
-    pid = 15
-    mass = 500
-
-    current_directory = os.getcwd()
-    readfileP = f"{current_directory}/4vector_{mass}GeV_PID{pid}_1jet.csv"
-    readfileA = f"{current_directory}/4vector_{mass}GeV_PID{-pid}_1jet.csv"
+    
 
     # Reading data
-    DDP = pd.read_csv(readfileP).to_numpy()
-    DDA = pd.read_csv(readfileA).to_numpy()
+    DDP = pd.read_csv(inputPathP).to_numpy()
+    DDA = pd.read_csv(inputPathA).to_numpy()
 
     # keep only first 4 columns of ddp and dda
     DDP = DDP[:, :4]
@@ -40,16 +38,12 @@ def process() -> list:
     data = [["EventID", "PID", "Layer", "r[cm]", "phi", "z[cm]", "E[GeV]", "px[GeV]", "py[GeV]", "pz[GeV]"]]
     passed = []
     count = 1
-    Lambda = 20
 
     for EventID in range(min(500, len(DDP))):
         vecs = [DDA[EventID], DDP[EventID]]
         AA = RunPoint(vecs[0], vecs[1], Lambda, False, True)
-        flag = len(AA) == 16
-        if flag:
-            
-            if len(passed) == 100:
-                break
+
+        if len(AA) == 16:
             
             passed.append(EventID+1)
             
@@ -64,14 +58,8 @@ def process() -> list:
                 count += 1
 
 
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles")
-
-    os.makedirs(path, exist_ok=True)
-
-    path = os.path.join(path, f"QuirkMass_{mass}_Lambda_{Lambda}.csv")
-
     df = pd.DataFrame(data[1:], columns=data[0])
-    df.to_csv(path, index=False)
+    df.to_csv(outputPath, index=False)
 
     return passed
 
@@ -82,7 +70,24 @@ if __name__ == '__main__':
     The script processes particle data from two input CSV files, generates hit points for each particle event, 
     and saves the processed data to a new CSV file.
     """
+
+    pid = 15
+    mass = 500
+    Lambda = 20
+
+
+    current_directory = os.getcwd()
+
+    inputPathP = f"{current_directory}/4vector_{mass}GeV_PID{pid}_1jet.csv"
+    inputPathA = f"{current_directory}/4vector_{mass}GeV_PID{-pid}_1jet.csv"
+
+    outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles")
+    os.makedirs(outputPath, exist_ok=True)
+    outputPath = os.path.join(outputPath, f"QuirkMass_{mass}_Lambda_{Lambda}.csv")
+
     
     start_time = time.time()
-    process()
+    passed = process(Lambda, inputPathP, inputPathA, outputPath)
+
     print(f"(Quirk Regular) Time taken: {time.time() - start_time} seconds")
+    print(f"passed: {passed}")

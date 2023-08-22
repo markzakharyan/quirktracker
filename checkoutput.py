@@ -2,6 +2,13 @@ import csv
 import argparse
 from typing import Union
 
+"""
+This is a really crude way of checking the difference between two csv files.
+It literally just compares the values in each cell and calculates the percentage difference between them.
+It doesn't match up events or anything.
+It's just a quick and dirty way of checking the difference between two csv files.
+"""
+
 def read_csv(file_path: str) -> list:
     """
     Read data from a CSV file.

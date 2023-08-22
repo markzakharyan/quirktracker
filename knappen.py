@@ -56,10 +56,10 @@ def beta(gamma: Union[float, ndarray]) -> Union[float, ndarray]:
     """Calculate the relativistic beta parameter.
 
     Parameters:
-    gamma (float or array-like): Lorentz factor.
+    gamma (float or ndarray): Lorentz factor.
 
     Returns:
-    float or array-like: Relativistic beta value.
+    float or ndarray: Relativistic beta value.
     """
 
     return np.sqrt(1 - 1 / np.array(gamma)**2)
@@ -69,10 +69,10 @@ def eta(gamma: Union[float, ndarray]) -> Union[float, ndarray]:
     """Calculate the relativistic eta parameter.
 
     Parameters:
-    gamma (float or array-like): Lorentz factor.
+    gamma (float or ndarray): Lorentz factor.
 
     Returns:
-    float or array-like: Relativistic eta value.
+    float or ndarray: Relativistic eta value.
     """
 
     return np.sqrt(np.array(gamma)**2 - 1)
@@ -82,11 +82,11 @@ def Tmax(ee: Union[float, ndarray], mm: Union[float, ndarray]) -> Union[float, n
     """Compute the maximum kinetic energy of a secondary particle produced in a collision.
 
     Parameters:
-    ee (float or array-like): Energy of the incident particle.
-    mm (float or array-like): Mass of the incident particle.
+    ee (float or ndarray): Energy of the incident particle.
+    mm (float or ndarray): Mass of the incident particle.
 
     Returns:
-    float or array-like: Maximum kinetic energy.
+    float or ndarray: Maximum kinetic energy.
     """
 
     ee = np.array(ee)
@@ -98,11 +98,11 @@ def Delta(eta: Union[float, ndarray], Elename: str) -> Union[float, ndarray]:
     """Calculate the density effect correction for radiation energy loss.
 
     Parameters:
-    eta (float or array-like): Relativistic eta parameter.
+    eta (float or ndarray): Relativistic eta parameter.
     Elename (str): Name of the element.
 
     Returns:
-    float or array-like: Density effect correction value.
+    float or ndarray: Density effect correction value.
     """
 
     eta = np.array(eta)
@@ -158,10 +158,10 @@ def s(x1: ndarray, x2: ndarray) -> ndarray:
     """Calculate the unit direction vector from point x1 to x2.
 
     Parameters:
-    x1, x2 (array-like): Coordinates of two points.
+    x1, x2 (ndarray): Coordinates of two points.
 
     Returns:
-    array-like: Unit direction vector.
+    ndarray: Unit direction vector.
     """
 
     return (x1 - x2) / norm(x1 - x2)
@@ -171,11 +171,11 @@ def vpar(v: ndarray, x1: ndarray, x2: ndarray) -> ndarray:
     """Compute the parallel component of velocity v with respect to the direction from x1 to x2.
 
     Parameters:
-    v (array-like): Velocity vector.
-    x1, x2 (array-like): Coordinates of two points.
+    v (ndarray): Velocity vector.
+    x1, x2 (ndarray): Coordinates of two points.
 
     Returns:
-    array-like: Parallel component of velocity.
+    ndarray: Parallel component of velocity.
     """
 
     return np.dot(v, s(x1, x2)) * s(x1, x2)
@@ -185,11 +185,11 @@ def vper(v: ndarray, x1: ndarray, x2: ndarray) -> ndarray:
     """Compute the perpendicular component of velocity v with respect to the direction from x1 to x2.
 
     Parameters:
-    v (array-like): Velocity vector.
-    x1, x2 (array-like): Coordinates of two points.
+    v (ndarray): Velocity vector.
+    x1, x2 (ndarray): Coordinates of two points.
 
     Returns:
-    array-like: Perpendicular component of velocity.
+    ndarray: Perpendicular component of velocity.
     """
 
     return v - vpar(v, x1, x2)
@@ -199,10 +199,10 @@ def gammasc(v: Union[float, ndarray]) -> Union[float, ndarray]:
     """Compute the Lorentz factor for a given velocity.
 
     Parameters:
-    v (float or array-like): Velocity.
+    v (float or ndarray): Velocity.
 
     Returns:
-    float or array-like: Lorentz factor.
+    float or ndarray: Lorentz factor.
     """
 
     return 1/np.sqrt(1 - v**2)
@@ -212,7 +212,7 @@ def gamma(v: ndarray) -> float:
     """Calculate the Lorentz factor for a given velocity vector.
 
     Parameters:
-    v (array-like): Velocity vector.
+    v (ndarray): Velocity vector.
 
     Returns:
     float: Lorentz factor.
@@ -225,10 +225,10 @@ def Lorentz(p4: ndarray) -> ndarray:
     """Calculate the Lorentz transformation matrix for a given 4-vector.
 
     Parameters:
-    p4 (array-like): 4-vector.
+    p4 (ndarray): 4-vector.
 
     Returns:
-    array-like: Lorentz transformation matrix.
+    ndarray: Lorentz transformation matrix.
     """
 
     v = norm(p4[1:4])/p4[0]
@@ -246,16 +246,16 @@ def DpDt(v: ndarray, x1: ndarray, x2: ndarray, q: float, ECM: ndarray, BCM: ndar
     """Compute the rate of change of momentum for a particle in an electromagnetic field.
 
     Parameters:
-    v (array-like): Velocity vector.
-    x1, x2 (array-like): Coordinates of two points.
+    v (ndarray): Velocity vector.
+    x1, x2 (ndarray): Coordinates of two points.
     q (float): Particle charge.
-    ECM (array-like): Electric field in center-of-mass frame.
-    BCM (array-like): Magnetic field in center-of-mass frame.
+    ECM (ndarray): Electric field in center-of-mass frame.
+    BCM (ndarray): Magnetic field in center-of-mass frame.
     T (float): Parameter related to string tension for quirk pairs.
     quirkflag (bool): Flag to indicate if the particle is a quirk.
 
     Returns:
-    array-like: Rate of change of momentum.
+    ndarray: Rate of change of momentum.
     """
 
     if quirkflag:
@@ -271,10 +271,10 @@ def FindTracks(vec1: ndarray, vec2: ndarray, rootsigma: float, quirkflag: bool, 
     """Find the trajectories of particles based on initial 4-vectors.
 
     Parameters:
-    vec1, vec2 (array-like): Initial 4-vectors of the particles.
+    vec1, vec2 (ndarray): Initial 4-vectors of the particles.
     rootsigma (float): Root of the sigma value.
     quirkflag (bool): Flag to indicate if the particle is a quirk.
-    Optional: B (array-like): Magnetic field in center-of-mass frame.
+    Optional: B (ndarray): Magnetic field in center-of-mass frame.
 
     Returns:
     tuple: Interpolated solutions for the trajectories and the maximum time value.
@@ -356,7 +356,7 @@ def FindEdges(vec1: ndarray, vec2: ndarray, root_sigma: float, layernr: int) -> 
     """Find the boundary edges where the particles might intersect with a detector layer.
 
     Parameters:
-    vec1, vec2 (array-like): Initial 4-vectors of the particles.
+    vec1, vec2 (ndarray): Initial 4-vectors of the particles.
     root_sigma (float): Root of the sigma value.
     layernr (int): Layer number of the detector.
 
@@ -470,7 +470,7 @@ def RunPoint(vec1, vec2, root_sigma, plotflag, quirkflag):
     """Run the simulation for a given initial condition and return the intersections with detector layers.
 
     Parameters:
-    vec1, vec2 (array-like): Initial 4-vectors of the particles.
+    vec1, vec2 (ndarray): Initial 4-vectors of the particles.
     root_sigma (float): Root of the sigma value.
     plotflag (bool): Flag to indicate if plots should be generated.
     quirkflag (bool): Flag to indicate if the particle is a quirk.
@@ -498,8 +498,9 @@ def RunPoint(vec1, vec2, root_sigma, plotflag, quirkflag):
                 circle = patches.Circle((0,0), i, fill=False)
                 ax.add_patch(circle)
 
-            ax.set_xlim(-15, 15)
-            ax.set_ylim(-15, 15)
+            rad = ATLASradiiPixel[-1]
+            ax.set_xlim(-rad, rad)
+            ax.set_ylim(-rad, rad)
 
             ax.axhline(0, color='black',linewidth=0.5)
             ax.axvline(0, color='black',linewidth=0.5)
