@@ -66,7 +66,10 @@ def process(passed: list, inputPath: str, outputPath: str) -> None:
 
     
     df = pd.DataFrame(data[1:], columns=data[0])
+
+    os.makedirs(os.path.join(*outputPath.split(os.path.sep)[:-1]), exist_ok=True)
     df.to_csv(outputPath, index=False)
+
     print(f"(Background Regular) Time taken: {time.time() - start_time} seconds")
 
 
@@ -77,8 +80,6 @@ if __name__ == "__main__":
     current_directory = os.getcwd()
     inputPath = f"{current_directory}/4vector_pionbgd_wCuts.csv"
 
-    outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", "Bgd")
-    os.makedirs(outputPath, exist_ok=True)
-    outputPath = os.path.join(outputPath, "Bgd_500_1jet_wCuts.csv")
+    outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", "Bgd", "Bgd_500_1jet_wCuts.csv")
     
     process(passed, inputPath, outputPath)

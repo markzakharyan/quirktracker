@@ -92,6 +92,8 @@ def process(Lambda, inputPathP, inputPathA, outputPath) -> List[int]:
     
 
     df = pd.DataFrame(data[1:], columns=data[0])
+
+    os.makedirs(os.path.join(*outputPath.split(os.path.sep)[:-1]), exist_ok=True)
     df.to_csv(outputPath, index=False)
 
     print(f"(Quirk Multiprocessed) Time taken: {time.time() - start_time} seconds")
@@ -115,9 +117,7 @@ if __name__ == '__main__':
     inputPathP = f"{current_directory}/4vector_{mass}GeV_PID{pid}_1jet.csv"
     inputPathA = f"{current_directory}/4vector_{mass}GeV_PID{-pid}_1jet.csv"
 
-    outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles")
-    os.makedirs(outputPath, exist_ok=True)
-    outputPath = os.path.join(outputPath, f"QuirkMass_{mass}_Lambda_{Lambda}_multiprocessed.csv")
+    outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", f"QuirkMass_{mass}_Lambda_{Lambda}_multiprocessed.csv")
 
 
     passed = process(Lambda, inputPathP, inputPathA, outputPath)
