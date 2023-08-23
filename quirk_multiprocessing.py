@@ -93,7 +93,7 @@ def process(Lambda, inputPathP, inputPathA, outputPath) -> List[int]:
 
     df = pd.DataFrame(data[1:], columns=data[0])
 
-    os.makedirs(os.path.join(*outputPath.split(os.path.sep)[:-1]), exist_ok=True)
+    os.makedirs(os.path.dirname(outputPath), exist_ok=True)
     df.to_csv(outputPath, index=False)
 
     print(f"(Quirk Multiprocessed) Time taken: {time.time() - start_time} seconds")

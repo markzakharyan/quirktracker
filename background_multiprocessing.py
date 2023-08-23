@@ -100,7 +100,7 @@ def process(passed: list, inputPath: str, outputPath: str) -> None:
     
     df = pd.DataFrame(all_data[1:], columns=all_data[0])
 
-    os.makedirs(os.path.join(*outputPath.split(os.path.sep)[:-1]), exist_ok=True)
+    os.makedirs(os.path.dirname(outputPath), exist_ok=True)
     df.to_csv(outputPath, index=False)
 
     print(f"(Background Multiprocessed) Time taken: {time.time() - start_time} seconds")

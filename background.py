@@ -67,7 +67,7 @@ def process(passed: list, inputPath: str, outputPath: str) -> None:
     
     df = pd.DataFrame(data[1:], columns=data[0])
 
-    os.makedirs(os.path.join(*outputPath.split(os.path.sep)[:-1]), exist_ok=True)
+    os.makedirs(os.path.dirname(outputPath), exist_ok=True)
     df.to_csv(outputPath, index=False)
 
     print(f"(Background Regular) Time taken: {time.time() - start_time} seconds")
