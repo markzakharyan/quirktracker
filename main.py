@@ -18,18 +18,14 @@ if __name__ == '__main__':
     pid = 15
     mass = 500
 
-    current_directory = os.getcwd()
 
-    quirk_inputPathP = f"{current_directory}/4vector_{mass}GeV_PID{pid}_1jet.csv"
-    quirk_inputPathA = f"{current_directory}/4vector_{mass}GeV_PID{-pid}_1jet.csv"
+    quirk_inputPathP = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"4vector_{mass}GeV_PID{pid}_1jet.csv")
+    quirk_inputPathA = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"4vector_{mass}GeV_PID{-pid}_1jet.csv")
+    quirk_path_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", f"QuirkMass_{mass}_Lambda_{Lambda}_multiprocessed.csv")
 
-    quirk_path_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles")
-    quirk_path_output = os.path.join(quirk_path_output, f"QuirkMass_{mass}_Lambda_{Lambda}_multiprocessed.csv")
+    background_path_input = os.path.join(os.path.dirname(os.path.abspath(__file__)), "4vector_pionbgd_wCuts.csv")
+    background_path_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", "Bgd", "Bgd_500_1jet_wCuts_multiprocessed.csv")
 
-    background_path_input = f"{current_directory}/4vector_pionbgd_wCuts.csv"
-
-    background_path_output = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", "Bgd")
-    background_path_output = os.path.join(background_path_output, "Bgd_500_1jet_wCuts_multiprocessed.csv")
 
 
     parser = argparse.ArgumentParser(description='Run simulation with quirk and background processes.')
