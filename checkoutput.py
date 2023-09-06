@@ -1,6 +1,6 @@
 import csv
 import argparse
-from typing import Union
+from typing import Union, List, Dict
 
 """
 This is a really crude way of checking the difference between two csv files.
@@ -9,20 +9,20 @@ It doesn't match up events or anything.
 It's just a quick and dirty way of checking the difference between two csv files.
 """
 
-def read_csv(file_path: str) -> list:
+def read_csv(file_path: str) -> Dict[str, List[str]]:
     """
-    Read data from a CSV file.
+    Read data from a CSV file and return a dictionary of rows indexed by eventID.
 
     Parameters:
     - file_path (str): Path to the CSV file.
 
     Returns:
-    - list: List of rows, where each row is a list of values.
+    - dict: Dictionary of rows indexed by eventID.
     """
 
     with open(file_path, 'r') as file:
         reader = csv.reader(file)
-        data = list(reader)
+        data = {row[0]: row for row in reader}
     return data
 
 def calculate_percentage_difference(value1: str, value2: str) -> Union[float, None]:
@@ -51,33 +51,56 @@ def calculate_percentage_difference(value1: str, value2: str) -> Union[float, No
             return None
     return None
 
-
-def compare_csvs(file1: str, file2: str, output_file: str) -> None:
+def read_csv_grouped_by_eventid(file_path: str) -> Dict[str, List[List[str]]]:
     """
-    Compare two CSV files cell by cell, calculating their percentage differences.
-    Writes the percentage differences to a new CSV file.
+    Read data from a CSV file and group rows by EventID.
+
+    Parameters:
+    - file_path (str): Path to the CSV file.
+
+    Returns:
+    - dict: Dictionary of rows grouped by EventID.
+    """
+
+    with open(file_path, 'r') as file:
+        reader = csv.reader(file)
+        header = next(reader)  # skip the header
+
+        data = {}
+
+        for row in reader:
+            event_id = row[0]
+            if event_id not in data:
+                data[event_id] = []
+            data[event_id].append(row)
+
+    return data
+
+def compare_csvs_by_eventid(file1: str, file2: str, output_file: str) -> None:
+    """
+    Compare two CSV files based on EventID and write their percentage differences to a new CSV file.
 
     Parameters:
     - file1 (str): Path to the first CSV file.
     - file2 (str): Path to the second CSV file.
     - output_file (str): Path to the output CSV file where the percentage differences will be written.
-
-    Notes:
-    - The two input CSV files should have the same dimensions.
-    - The output CSV file will have the same dimensions as the input files, with the cells containing the percentage differences.
     """
 
-    data1 = read_csv(file1)
-    data2 = read_csv(file2)
+    data1 = read_csv_grouped_by_eventid(file1)
+    data2 = read_csv_grouped_by_eventid(file2)
 
     with open(output_file, 'w', newline='') as file:
         writer = csv.writer(file)
+        
+        # Writing the header
+        writer.writerow(["EventID", "PID", "Layer", "r[cm]", "phi", "z[cm]", "E[GeV]", "px[GeV]", "py[GeV]", "pz[GeV]"])
 
-        writer.writerow(data1[0])
-
-        for row1, row2 in zip(data1[1:], data2[1:]):
-            diff_row = [calculate_percentage_difference(cell1, cell2) for cell1, cell2 in zip(row1, row2)]
-            writer.writerow(diff_row)
+        for event_id, rows1 in data1.items():
+            rows2 = data2.get(event_id)
+            if rows2:
+                for row1, row2 in zip(rows1, rows2):
+                    diff_row = [calculate_percentage_difference(cell1, cell2) for cell1, cell2 in zip(row1, row2)]
+                    writer.writerow([0] + diff_row)
 
 if __name__ == '__main__':
     """
@@ -98,4 +121,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    compare_csvs(args.file1, args.file2, args.output_file)
+    compare_csvs_by_eventid(args.file1, args.file2, args.output_file)
