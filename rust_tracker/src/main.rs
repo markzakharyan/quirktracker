@@ -1,9 +1,9 @@
-use std::{cmp::Ordering, borrow::BorrowMut};
+use std::{borrow::BorrowMut, cmp::Ordering, sync::Arc};
 // use rayon::prelude::*;
 // use std::sync::Mutex;
 // use ndarray::{Array1, Array2, ArrayBase, Data, Ix1};
 use nalgebra::{Matrix4, Vector2};
-use ode_solvers::{dop853::Dop853, SVector, System, Vector3, Vector4, Rk4};
+use ode_solvers::{dop853::Dop853, Rk4, SVector, System, Vector3, Vector4};
 use roots::{find_root_brent, SimpleConvergency};
 
 const ETA_ETA: [[f64; 4]; 4] = [
@@ -200,7 +200,8 @@ fn dp_dt(
         let s_x1_x2 = s(x1, x2);
         let vpar_vec = vpar(v, x1, x2);
         let vp_div_sqrt = vp / (1.0 - vp_dot_vp).sqrt();
-        -t * ((1.0 - vp_dot_vp).sqrt() * s_x1_x2 + vpar_vec.dot(&s_x1_x2) * vp_div_sqrt) + q * (ecm + v.cross(bcm))
+        -t * ((1.0 - vp_dot_vp).sqrt() * s_x1_x2 + vpar_vec.dot(&s_x1_x2) * vp_div_sqrt)
+            + q * (ecm + v.cross(bcm))
     } else {
         q * (ecm + v.cross(bcm))
     }
@@ -246,7 +247,7 @@ impl System<State> for ParticleSystem {
                 self.t,
                 self.quirkflag,
             );
-        
+
         let dx1dt = gammabeta1 / (1.0 + gammabeta1.norm_squared()).sqrt();
         let dx2dt = gammabeta2 / (1.0 + gammabeta2.norm_squared()).sqrt();
 
@@ -312,20 +313,23 @@ fn find_tracks(
     let step_size = total_time / (num_steps as f64); // Approximate step size
 
     // let mut stepper = Dop853::new(system, 0.1, 10e19, step_size, y0, 1.0e-5, 1.0e-5);
-    
-    let mut stepper = Rk4::new(system, 0.1, y0, total_time, step_size);
+
+    let event_fn: Box<dyn Fn(Time, &State, &Matrix4<f64>) -> bool> = Box::new(
+        |time, state, boost_back| {
+            let mult_vec: Vector4<f64> = Vector4::new(INV_GEV_IN_SEC, INV_GEV_IN_CM, INV_GEV_IN_CM, INV_GEV_IN_CM);
+            let sumx12: Vector3<f64> = state.fixed_rows::<3>(6).into_owned() + state.fixed_rows::<3>(9).into_owned();
+            let norm: f64 = (yzw(&mult_vec.component_mul(&(boost_back * Vector4::new(time, sumx12.x, sumx12.y, sumx12.z))))).norm();
+            println!("norm: {}", norm);
+            norm > 60.0
+        },
+    );
+
+    let mut stepper = Rk4::new(system, 0.1, y0, total_time, step_size, boost_back).with_event_fn(event_fn);
+
+
 
     let res = stepper.integrate();
 
-    // let res = while stepper.integrate() == IntegratorStatus::Ok {
-    //     let (t, y) = stepper.values();
-    //     println!("t = {}, y = {:?}", t, y);
-
-    //     // Stop condition (if any)
-    //     if t > tf {
-    //         break;
-    //     }
-    // }
 
     // Handle result
     let mut sol0_values: Vec<Vector4<f64>> = Vec::new();
@@ -435,14 +439,15 @@ fn find_edges(
 
     let vcm_yzw = yzw(&vcm);
 
-    
     let a = vcm_yzw.xy().norm_squared() * INV_GEV_IN_CM.powi(2);
-    
+
     let b_0 = 2.0 * vcm_yzw.xy().dot(&el0_yzw.xy()) * INV_GEV_IN_CM.powi(2);
-    let c_0 = el0_yzw.xy().norm_squared() * INV_GEV_IN_CM.powi(2) - ATLAS_RADII_PIXEL[(layer_number - 1) as usize].powi(2);
+    let c_0 = el0_yzw.xy().norm_squared() * INV_GEV_IN_CM.powi(2)
+        - ATLAS_RADII_PIXEL[(layer_number - 1) as usize].powi(2);
 
     let b_1 = 2.0 * vcm_yzw.xy().dot(&el1_yzw.xy()) * INV_GEV_IN_CM.powi(2);
-    let c_1 = el1_yzw.xy().norm_squared() * INV_GEV_IN_CM.powi(2) - ATLAS_RADII_PIXEL[(layer_number - 1) as usize].powi(2);
+    let c_1 = el1_yzw.xy().norm_squared() * INV_GEV_IN_CM.powi(2)
+        - ATLAS_RADII_PIXEL[(layer_number - 1) as usize].powi(2);
 
     let roots0: Vec<f64>;
     let roots1: Vec<f64>;
@@ -469,7 +474,6 @@ fn find_edges(
     for root in roots1.iter() {
         solutions.push((vcm_yzw * *root + el1_yzw).z * INV_GEV_IN_CM);
     }
-    
 
     if solutions.iter().any(|&sol| sol.is_finite()) {
         return solutions;
@@ -520,7 +524,9 @@ fn beta_beta(traj_map: &Interpolator, t0: f64) -> f64 {
 
     // return ((np.linalg.norm(trajMap([t0 + epsilon])[0][1:4]) - np.linalg.norm(trajMap([t0])[0][1:4])) / (trajMap([t0 + epsilon])[0][0] - trajMap([t0])[0][0])) / (3 * 10**10)
 
-    (yzw(&traj_map_t0_plus_epsilon).norm() - yzw(&traj_map_t0).norm()) / (traj_map_t0_plus_epsilon.x - traj_map_t0.x) / 3.0e10
+    (yzw(&traj_map_t0_plus_epsilon).norm() - yzw(&traj_map_t0).norm())
+        / (traj_map_t0_plus_epsilon.x - traj_map_t0.x)
+        / 3.0e10
 }
 
 fn gamma_gamma(traj_map: &Interpolator, t0: f64) -> f64 {
@@ -529,10 +535,13 @@ fn gamma_gamma(traj_map: &Interpolator, t0: f64) -> f64 {
 
 fn find_intersections(traj: &Interpolator) -> Vec<(i32, f64, f64, f64, f64, f64)> {
     let t_values = traj.t.clone();
-    let r_values: Vec<f64> = t_values.iter().map(|&t| {
-        let traj_t = traj.interpolate(t);
-        Vector3::new(traj_t[1], traj_t[2], 0.0).norm()
-    }).collect();
+    let r_values: Vec<f64> = t_values
+        .iter()
+        .map(|&t| {
+            let traj_t = traj.interpolate(t);
+            Vector3::new(traj_t[1], traj_t[2], 0.0).norm()
+        })
+        .collect();
 
     let coarse_list: Vec<(f64, f64, f64, f64)> = t_values
         .iter()
@@ -568,7 +577,6 @@ fn find_intersections(traj: &Interpolator) -> Vec<(i32, f64, f64, f64, f64, f64)
                     max_iter: 1000,
                 },
             );
-            
 
             if let Ok(t) = root {
                 let traj_t = traj.interpolate(t);
@@ -586,41 +594,72 @@ fn find_intersections(traj: &Interpolator) -> Vec<(i32, f64, f64, f64, f64, f64)
                     INV_GEV_TO_NANO_SEC * gamma * t,
                 ));
             }
-            
         }
     }
 
     final_list
 }
 
-fn run_point(vec1: &Vector4<f64>, vec2: &Vector4<f64>, root_sigma: f64, plotflag:bool, quirkflag: bool) -> Vec<(i32, f64, f64, f64, f64, f64, i32)> {
+fn run_point(
+    vec1: &Vector4<f64>,
+    vec2: &Vector4<f64>,
+    root_sigma: f64,
+    plotflag: bool,
+    quirkflag: bool,
+) -> Vec<(i32, f64, f64, f64, f64, f64, i32)> {
     // findedges1,findedges2 = FindEdges(vec1, vec2, root_sigma, 1),FindEdges(vec1, vec2, root_sigma, 2)
     let find_edges1: Vec<f64> = find_edges(vec1, vec2, root_sigma, 1);
     let find_edges2: Vec<f64> = find_edges(vec1, vec2, root_sigma, 2);
 
-    if (!find_edges1.is_empty() && find_edges1.iter().map(|x| x.abs()).min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal)).unwrap() < ATLAS_Z_RANGE[0])
-        || (!find_edges2.is_empty() && find_edges2.iter().map(|x| x.abs()).min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal)).unwrap() < ATLAS_Z_RANGE[1]) {
-            
-            let (sol_1, sol2) = find_tracks(vec1, vec2, root_sigma, quirkflag, &Vector3::new(0.0, 0.0, 1.18314e-16));
+    if (!find_edges1.is_empty()
+        && find_edges1
+            .iter()
+            .map(|x| x.abs())
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+            .unwrap()
+            < ATLAS_Z_RANGE[0])
+        || (!find_edges2.is_empty()
+            && find_edges2
+                .iter()
+                .map(|x| x.abs())
+                .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                .unwrap()
+                < ATLAS_Z_RANGE[1])
+    {
+        let (sol_1, sol2) = find_tracks(
+            vec1,
+            vec2,
+            root_sigma,
+            quirkflag,
+            &Vector3::new(0.0, 0.0, 1.18314e-16),
+        );
 
-            if plotflag {}
-            
-            // [ 1.50775080e-12  2.76774029e-02  1.65250495e-02 -2.73291617e-02]
-            println!("thing: {:?}", sol_1.interpolate(1.5e12));
+        if plotflag {}
 
-            let intersections1 = find_intersections(&sol_1);
-            let intersections2 = find_intersections(&sol2);
+        // [ 1.50775080e-12  2.76774029e-02  1.65250495e-02 -2.73291617e-02]
+        println!("thing: {:?}", sol_1.interpolate(1.5e12));
 
-            // Assuming intersections1 and intersections2 are Vec<(i32, f64, f64, f64, f64, f64)>
-            let mut combined_intersections: Vec<(i32, f64, f64, f64, f64, f64, i32)> = intersections1.iter().map(|&(a, b, c, d, e, f)| (a, b, c, d, e, f, 1)).chain(intersections2.iter().map(|&(a, b, c, d, e, f)| (a, b, c, d, e, f, 2))) .collect();
+        let intersections1 = find_intersections(&sol_1);
+        let intersections2 = find_intersections(&sol2);
 
-            // Sort the combined list of tuples
-            combined_intersections.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        // Assuming intersections1 and intersections2 are Vec<(i32, f64, f64, f64, f64, f64)>
+        let mut combined_intersections: Vec<(i32, f64, f64, f64, f64, f64, i32)> = intersections1
+            .iter()
+            .map(|&(a, b, c, d, e, f)| (a, b, c, d, e, f, 1))
+            .chain(
+                intersections2
+                    .iter()
+                    .map(|&(a, b, c, d, e, f)| (a, b, c, d, e, f, 2)),
+            )
+            .collect();
 
-            return combined_intersections;
+        // Sort the combined list of tuples
+        combined_intersections
+            .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        }
-        return Vec::new();
+        return combined_intersections;
+    }
+    return Vec::new();
 }
 
 fn main() {
