@@ -78,7 +78,6 @@ where
             // Check if the event function is set and if the event has occurred
             if let Some(ref event_fn) = self.event_fn {
                 if event_fn(x_new, &y_new, &self.boost_back) {
-                    println!("Event occurred at x = {}", x_new);
                     break; // Stop integration if the event occurs
                 }
             }
