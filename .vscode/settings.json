@@ -1,0 +1,8 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./rust_tracker/Cargo.toml",
+        "./rust_tracker/Cargo.toml",
+        "./rust_tracker/Cargo.toml",
+        "./rust_tracker/Cargo.toml"
+    ]
+}

@@ -1,5 +1,5 @@
-if __name__ == "__main__":
-    raise Exception("This file is not meant to be run as a script. Please import it from another python file.")
+# if __name__ == "__main__":
+#     raise Exception("This file is not meant to be run as a script. Please import it from another python file.")
 
 from typing import Callable, Tuple, Union
 import numpy as np
@@ -296,10 +296,10 @@ def FindTracks(vec1: ndarray, vec2: ndarray, rootsigma: float, quirkflag: bool, 
         x1 = y[6:9]
         x2 = y[9:12]
         Ef = y[12:15]
-        dgammabeta1dt = (1/m) * DpDt((gammabeta1/math.sqrt(1+(np.dot(gammabeta1,gammabeta1)))), x1, x2, 1, Ef, BCM, T, quirkflag)
-        dgammabeta2dt = (1/m) * DpDt((gammabeta2/math.sqrt(1+(np.dot(gammabeta2,gammabeta2)))), x2, x1, -1, Ef, BCM, T, quirkflag)
-        dx1dt = gammabeta1/math.sqrt(1+(np.dot(gammabeta1,gammabeta1)))
-        dx2dt = gammabeta2/math.sqrt(1+(np.dot(gammabeta2,gammabeta2)))
+        dgammabeta1dt = (1/m) * DpDt((gammabeta1/np.sqrt(1+(np.dot(gammabeta1,gammabeta1)))), x1, x2, 1, Ef, BCM, T, quirkflag)
+        dgammabeta2dt = (1/m) * DpDt((gammabeta2/np.sqrt(1+(np.dot(gammabeta2,gammabeta2)))), x2, x1, -1, Ef, BCM, T, quirkflag)
+        dx1dt = gammabeta1/np.sqrt(1+(np.dot(gammabeta1,gammabeta1)))
+        dx2dt = gammabeta2/np.sqrt(1+(np.dot(gammabeta2,gammabeta2)))
         dEfdt = np.array([0,0,0])
         dydt = np.concatenate((dgammabeta1dt, dgammabeta2dt, dx1dt, dx2dt, dEfdt))
         return dydt
@@ -366,7 +366,8 @@ def FindEdges(vec1: ndarray, vec2: ndarray, root_sigma: float, layernr: int) -> 
 
     vcm = (vec1 + vec2) / 2
     vcmInv = np.array([vcm[0], -vcm[1], -vcm[2], -vcm[3]])
-    vecscm = np.array([Lorentz(vcm).dot(v) for v in [vec1, vec2]])
+    lvcm = Lorentz(vcm)
+    vecscm = np.array([lvcm.dot(v) for v in [vec1, vec2]])
         
     m = np.sqrt(vecscm[0].dot(EtaEta).dot(vecscm[0]))
     sigma = (root_sigma*10**-9)**2
@@ -388,15 +389,13 @@ def FindEdges(vec1: ndarray, vec2: ndarray, root_sigma: float, layernr: int) -> 
 
     eq1tsol, eq2tsol = sp.solve(eq1, t), sp.solve(eq2, t)
     
-
     line1sol = np.array([line1[2].subs(t,eq1tsol[i]) for i in range(len(eq1tsol))])
     line2sol = np.array([line2[2].subs(t,eq2tsol[i]) for i in range(len(eq2tsol))])
     solutions = sp.flatten([line1sol,line2sol])
 
-    if any(isinstance(sol, (int, float)) for sol in solutions):
-        return solutions
-    elif len(solutions)>0 :
-        return [0]
+    r = np.array([float(sol.evalf()) for sol in solutions if isinstance(sol.evalf(), sp.core.numbers.Float)])
+    
+    return r if len(r) > 0 else [0]
    
 
 epsilon = 10**6
@@ -466,7 +465,7 @@ def FindIntersections(traj: interp1d) -> list:
     return finallist
 
 
-def RunPoint(vec1, vec2, root_sigma, plotflag, quirkflag):
+def RunPoint(vec1, vec2, root_sigma, plotflag, quirkflag) -> list:
     """Run the simulation for a given initial condition and return the intersections with detector layers.
 
     Parameters:
@@ -481,8 +480,9 @@ def RunPoint(vec1, vec2, root_sigma, plotflag, quirkflag):
 
     findedges1,findedges2 = FindEdges(vec1, vec2, root_sigma, 1),FindEdges(vec1, vec2, root_sigma, 2)
 
-    if (findedges1 != None and min(map(abs,findedges1)) < ATLASzrange[0]) or (findedges2 != None and min(map(abs,findedges2)) < ATLASzrange[1]):
+    if (findedges1 is not None and min(map(abs,findedges1)) < ATLASzrange[0]) or (findedges2 is not None and min(map(abs,findedges2)) < ATLASzrange[1]):
         sol1, sol2, tmax = FindTracks(vec1, vec2, root_sigma, quirkflag)
+        sol1_array = sol1.y[0]
 
         if plotflag:
             sol1_array = sol1.y
@@ -517,3 +517,11 @@ def RunPoint(vec1, vec2, root_sigma, plotflag, quirkflag):
 
     else:
         return [[0]]
+    
+
+vecs1 = np.array([[421.69956147, 258.12146064, 
+    154.10248991, -254.86516886], [202.65928421, -123.22431566, 
+    12.442253162, 56.848428683]])
+
+AA = RunPoint(np.array(vecs1[0]), np.array(vecs1[1]), 500, False, True)
+print(AA)
