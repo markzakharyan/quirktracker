@@ -319,7 +319,6 @@ fn find_tracks(
             let mult_vec: Vector4<f64> = Vector4::new(INV_GEV_IN_SEC, INV_GEV_IN_CM, INV_GEV_IN_CM, INV_GEV_IN_CM);
             let sumx12: Vector3<f64> = state.fixed_rows::<3>(6).into_owned() + state.fixed_rows::<3>(9).into_owned();
             let norm: f64 = (yzw(&mult_vec.component_mul(&(boost_back * Vector4::new(time, sumx12.x, sumx12.y, sumx12.z))))).norm();
-            println!("norm: {}", norm);
             norm > 60.0
         },
     );
@@ -337,7 +336,6 @@ fn find_tracks(
 
     match res {
         Ok(stats) => {
-            println!("{stats}");
             let time_points: &Vec<f64> = stepper.x_out();
             let sol_states: &Vec<SVector<f64, 15>> = stepper.y_out();
 
@@ -348,23 +346,10 @@ fn find_tracks(
             //     sol2_keys.append(solution.t[i])
             //     sol2_values.append(np.array([invGeVinsec, invGeVincm, invGeVincm, invGeVincm]* np.dot(boostback, np.array([solution.t[i], solution.y[9,i], solution.y[10,i], solution.y[11,i]]))))
 
+            let conversion_vec: Vector4<f64> = Vector4::new(INV_GEV_IN_SEC, INV_GEV_IN_CM, INV_GEV_IN_CM, INV_GEV_IN_CM);
             for i in 0..time_points.len() {
-                let sol0: Vector4<f64> = INV_GEV_IN_SEC
-                    * boost_back
-                    * Vector4::new(
-                        time_points[i],
-                        sol_states[i][6],
-                        sol_states[i][7],
-                        sol_states[i][8],
-                    );
-                let sol1: Vector4<f64> = INV_GEV_IN_SEC
-                    * boost_back
-                    * Vector4::new(
-                        time_points[i],
-                        sol_states[i][9],
-                        sol_states[i][10],
-                        sol_states[i][11],
-                    );
+                let sol0: Vector4<f64> = conversion_vec.component_mul(&(boost_back * Vector4::new(time_points[i], sol_states[i][6], sol_states[i][7], sol_states[i][8])));
+                let sol1: Vector4<f64> = conversion_vec.component_mul(&(boost_back * Vector4::new(time_points[i], sol_states[i][9], sol_states[i][10], sol_states[i][11])));
                 sol0_values.push(sol0);
                 sol1_values.push(sol1);
             }
@@ -635,9 +620,6 @@ fn run_point(
         );
 
         if plotflag {}
-
-        // [ 1.50775080e-12  2.76774029e-02  1.65250495e-02 -2.73291617e-02]
-        println!("thing: {:?}", sol_1.interpolate(1.5e12));
 
         let intersections1 = find_intersections(&sol_1);
         let intersections2 = find_intersections(&sol2);

@@ -484,6 +484,9 @@ def RunPoint(vec1, vec2, root_sigma, plotflag, quirkflag) -> list:
         sol1, sol2, tmax = FindTracks(vec1, vec2, root_sigma, quirkflag)
         sol1_array = sol1.y[0]
 
+        thing = sol1(1.5e12)
+        print(thing)
+
         if plotflag:
             sol1_array = sol1.y
             sol2_array = sol2.y
