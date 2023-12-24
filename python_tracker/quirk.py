@@ -40,6 +40,7 @@ def process(Lambda, inputPathP, inputPathA, outputPath) -> list:
     count = 1
 
     for EventID in range(min(500, len(DDP))):
+        print(f"EventId: {EventID}")
         vecs = [DDA[EventID], DDP[EventID]]
         AA = RunPoint(vecs[0], vecs[1], Lambda, False, True)
 
@@ -80,8 +81,8 @@ if __name__ == '__main__':
 
     current_directory = os.getcwd()
 
-    inputPathP = f"{current_directory}/4vector_{mass}GeV_PID{pid}_1jet.csv"
-    inputPathA = f"{current_directory}/4vector_{mass}GeV_PID{-pid}_1jet.csv"
+    inputPathP = f"{current_directory}/python_tracker/4vector_{mass}GeV_PID{pid}_1jet.csv"
+    inputPathA = f"{current_directory}/python_tracker/4vector_{mass}GeV_PID{-pid}_1jet.csv"
 
     outputPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HitFiles", f"QuirkMass_{mass}_Lambda_{Lambda}.csv")
 

@@ -13,3 +13,5 @@ ode_solvers = { path = "./ode-solvers" }
 roots = "*"
 num-traits = "*"
 simba = "*"
+csv = "*"
+serde = { version = "*", features = ["derive"] }
