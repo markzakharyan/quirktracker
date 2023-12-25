@@ -10,7 +10,7 @@ use std::env;
 fn main() {
     let matches = App::new("Quirk and Background Simulation")
         .version("1.0")
-        .author("Author Name")
+        .author("Mark Zakharyan & Shelley Tong, w/ credit to Max Fieg for the original Mathematica code")
         .about("Run simulation with quirk and background processes.")
         .arg(Arg::with_name("quirk_inputPathP")
             .long("quirk_inputPathP")
