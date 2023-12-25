@@ -1,17 +1,10 @@
-use std::{borrow::BorrowMut, cmp::Ordering, sync::Arc, f64::consts::PI};
+use std::{cmp::Ordering, f64::consts::PI};
 // use rayon::prelude::*;
 // use std::sync::Mutex;
 // use ndarray::{Array1, Array2, ArrayBase, Data, Ix1};
 use nalgebra::{Matrix4, Vector2};
-use ode_solvers::{dop853::Dop853, Rk4, SVector, System, Vector3, Vector4};
+use ode_solvers::{Rk4, SVector, System, Vector3, Vector4}; //, dop853::Dop853
 use roots::{find_root_brent, SimpleConvergency};
-
-const ETA_ETA: [[f64; 4]; 4] = [
-    [1.0, 0.0, 0.0, 0.0],
-    [0.0, -1.0, 0.0, 0.0],
-    [0.0, 0.0, -1.0, 0.0],
-    [0.0, 0.0, 0.0, -1.0],
-];
 
 const ETA_ETA_MATRIX: Matrix4<f64> = Matrix4::new(
     1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0,
@@ -26,7 +19,7 @@ const INV_GEV_TO_NANO_SEC: f64 = 1e9 / (1.52e24);
 pub static ATLAS_RADII_PIXEL: [f64; 8] = [3.10, 5.05, 8.85, 12.25, 29.9, 37.1, 44.3, 51.4];
 const ATLAS_Z_RANGE: [f64; 8] = [32.0, 40.0, 40.0, 40.0, 74.9, 74.9, 74.9, 74.9];
 
-static LENGTH_IN_PHI: [f64; 8] = [0.005, 0.005, 0.005, 0.005, 0.0034, 0.0034, 0.0034, 0.0034];
+// static LENGTH_IN_PHI: [f64; 8] = [0.005, 0.005, 0.005, 0.005, 0.0034, 0.0034, 0.0034, 0.0034];
 
 static PHI_SIZE: [f64; 8] = [
     0.0016129,
@@ -46,7 +39,7 @@ const ME: f64 = 0.511e-3;
 const RE: f64 = 2.81794033e-15 * 100.0; // fm to m conversion and then to cm
 const EV2GEV: f64 = 10e-9;
 
-static HBAR_OMEGA_P_SI: f64 = 31.05;
+// static HBAR_OMEGA_P_SI: f64 = 31.05;
 static STERNHEIMER_A_SI: f64 = 0.1492;
 static STERNHEIMER_K_SI: f64 = 3.2546;
 static STERNHEIMER_X0_SI: f64 = 0.2015;
@@ -61,13 +54,13 @@ static A_SI: f64 = 28.085;
 
 static RHO_SI: f64 = 2.33;
 
-static X0_SI: f64 = 9.37;
+// static X0_SI: f64 = 9.37;
 
-static LAMBDA_SI: f64 = 46.52;
+// static LAMBDA_SI: f64 = 46.52;
 
-static LAMBDAC_SI: f64 = 30.16;
+// static LAMBDAC_SI: f64 = 30.16;
 
-static EEHOLE_SI: f64 = 3.6;
+// static EEHOLE_SI: f64 = 3.6;
 
 const THICKNESSES: [f64; 8] = [0.023, 0.025, 0.025, 0.025, 0.0285, 0.0285, 0.0285, 0.0285];
 const DELTA_R: [f64; 8] = THICKNESSES;
@@ -80,12 +73,12 @@ fn eta(gamma: f64) -> f64 {
     (gamma.powi(2) - 1.0).sqrt()
 }
 
-fn tmax(ee: f64, mm: f64, me: f64) -> f64 {
-    let eta_ee_mm = eta(ee / mm);
-    let beta_ee_mm = beta(ee / mm);
-    2.0 * me * eta_ee_mm.powi(2)
-        / (1.0 + 2.0 * eta_ee_mm / beta_ee_mm * me / mm + (me / mm).powi(2))
-}
+// fn tmax(ee: f64, mm: f64, me: f64) -> f64 {
+//     let eta_ee_mm = eta(ee / mm);
+//     let beta_ee_mm = beta(ee / mm);
+//     2.0 * me * eta_ee_mm.powi(2)
+//         / (1.0 + 2.0 * eta_ee_mm / beta_ee_mm * me / mm + (me / mm).powi(2))
+// }
 
 fn delta(eta: f64) -> f64 {
     let x0 = STERNHEIMER_X0_SI;
@@ -109,6 +102,7 @@ fn delta(eta: f64) -> f64 {
 }
 
 fn delta_p_pdg(x: f64, gamma: f64, z: f64) -> f64 {
+    // TODO: Ensure this function works as expected!
     
 
     // 1.0 * Rho_Si * 4 * np.pi * NA * re**2 * me * z**2 *0.5 * Z_Si * x / (A_Si * beta(gamma)**2) * 
@@ -275,9 +269,9 @@ fn find_tracks(
     let bcm: Vector3<f64> =
         gamma_vcm * b - ((gamma_vcm - 1.0) * (b.dot(&vcm) / vcm.norm()) * (vcm / vcm.norm()));
 
-    let mut tmax = false;
+    // let mut tmax = false;
 
-    let e: f64 = (4.0 * std::f64::consts::PI * 1.0 / 137.0).sqrt();
+    // let e: f64 = (4.0 * std::f64::consts::PI * 1.0 / 137.0).sqrt();
 
     let system = ParticleSystem {
         m,
@@ -332,13 +326,6 @@ fn find_tracks(
             let time_points: &Vec<f64> = stepper.x_out();
             let sol_states: &Vec<SVector<f64, 15>> = stepper.y_out();
 
-            //         sol1_keys, sol1_values, sol2_keys, sol2_values = [], [], [], []
-            // for i in range(0,len(solution.t)):
-            //     sol1_keys.append(solution.t[i])
-            //     sol1_values.append(np.array([invGeVinsec, invGeVincm, invGeVincm, invGeVincm]* np.dot(boostback, np.array([solution.t[i], solution.y[6,i], solution.y[7,i], solution.y[8,i]]))))
-            //     sol2_keys.append(solution.t[i])
-            //     sol2_values.append(np.array([invGeVinsec, invGeVincm, invGeVincm, invGeVincm]* np.dot(boostback, np.array([solution.t[i], solution.y[9,i], solution.y[10,i], solution.y[11,i]]))))
-
             let conversion_vec: Vector4<f64> = Vector4::new(INV_GEV_IN_SEC, INV_GEV_IN_CM, INV_GEV_IN_CM, INV_GEV_IN_CM);
             for i in 0..time_points.len() {
                 let sol0: Vector4<f64> = conversion_vec.component_mul(&(boost_back * Vector4::new(time_points[i], sol_states[i][6], sol_states[i][7], sol_states[i][8])));
@@ -381,9 +368,6 @@ fn find_edges(
 
     let t_max: f64 = (m * v0) / ((1.0 - v0.powi(2)).sqrt() * sigma);
     let r_max: f64 = (m * (-1.0 + 1.0 / (1.0 - v0.powi(2)).sqrt())) / sigma;
-
-    // endpoints = np.array([[tmax,((v[1:4]/norm(v[1:4])) * rmax)[0],((v[1:4]/norm(v[1:4])) * rmax)[1],((v[1:4]/norm(v[1:4])) * rmax)[2]] if norm(v[1:4]) != 0 else [tmax,(np.array([0,0,0]) * rmax)[0],(np.array([0,0,0]) * rmax)[1],(np.array([0,0,0]) * rmax)[2]] for v in vecscm])
-    // endpointslab = np.array([Lorentz(vcmInv).dot(e) for e in endpoints])
 
     let endpoints: Vec<Vector4<f64>> = vecs_cm
         .iter()
@@ -535,7 +519,6 @@ fn find_intersections(traj: &Interpolator) -> Vec<(i32, f64, f64, f64, f64, f64)
         let phi_size_layer = PHI_SIZE[layer];
         let z_size_layer = Z_SIZE[layer];
 
-        // layerlist = coarselist[(coarselist[:, 1] - ATLASradiiPixel[layer]) * (coarselist[:, 3] - ATLASradiiPixel[layer]) < 0]
         let layer_list: Vec<(f64, f64, f64, f64)> = coarse_list
             .iter()
             .filter(|row| (row.1 - layer_radius) * (row.3 - layer_radius) < 0.0)
@@ -585,7 +568,6 @@ pub fn run_point(
     plotflag: bool,
     quirkflag: bool,
 ) -> Vec<(i32, f64, f64, f64, f64, f64, i32)> {
-    // findedges1,findedges2 = FindEdges(vec1, vec2, root_sigma, 1),FindEdges(vec1, vec2, root_sigma, 2)
     let find_edges1: Vec<f64> = find_edges(vec1, vec2, root_sigma, 1);
     let find_edges2: Vec<f64> = find_edges(vec1, vec2, root_sigma, 2);
 
@@ -617,7 +599,6 @@ pub fn run_point(
         let intersections1 = find_intersections(&sol_1);
         let intersections2 = find_intersections(&sol2);
 
-        // Assuming intersections1 and intersections2 are Vec<(i32, f64, f64, f64, f64, f64)>
         let mut combined_intersections: Vec<(i32, f64, f64, f64, f64, f64, i32)> = intersections1
             .iter()
             .map(|&(a, b, c, d, e, f)| (a, b, c, d, e, f, 1))
@@ -628,7 +609,6 @@ pub fn run_point(
             )
             .collect();
 
-        // Sort the combined list of tuples
         combined_intersections
             .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
