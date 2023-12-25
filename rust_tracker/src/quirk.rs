@@ -1,8 +1,10 @@
 use crate::knappen::{run_point, ATLAS_RADII_PIXEL};
-use csv::WriterBuilder;
+use csv::{WriterBuilder, Writer};
 use nalgebra::Vector4;
 use serde::Deserialize;
 use std::env;
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::Path;
 use std::time::Instant;
 
@@ -21,11 +23,18 @@ pub fn process(lambda: f64, input_path_p: &str, input_path_a: &str, output_path:
     let particles_p: Vec<Particle> = rdr_p.deserialize().map(|result| result.unwrap()).collect();
     let particles_a: Vec<Particle> = rdr_a.deserialize().map(|result| result.unwrap()).collect();
 
-    let mut data: Vec<Vec<String>> = vec![
-        vec!["EventID", "PID", "Layer", "r[cm]", "phi", "z[cm]", "E[GeV]", "px[GeV]", "py[GeV]", "pz[GeV]"]
-            .iter().map(|&s| s.to_string()).collect(),
-    ];
+    std::fs::create_dir_all(Path::new(output_path).parent().unwrap()).unwrap();
+    let file = File::create(output_path).unwrap();
+    let mut writer = BufWriter::new(file);
+    let mut csv_writer = Writer::from_writer(writer);
+
+    // Write headers
+    csv_writer.write_record(&["EventID", "PID", "Layer", "r[cm]", "phi", "z[cm]", "E[GeV]", "px[GeV]", "py[GeV]", "pz[GeV]"]).unwrap();
+
+
     let mut passed = Vec::new();
+    let mut buffer: Vec<Vec<String>> = Vec::new();
+
 
     for (event_id, (particle_p, particle_a)) in particles_p.iter().zip(particles_a.iter()).enumerate().take(500) {
         let vec1 = Vector4::new(particle_p.E, particle_p.px, particle_p.py, particle_p.pz);
@@ -33,7 +42,37 @@ pub fn process(lambda: f64, input_path_p: &str, input_path_a: &str, output_path:
 
         let vecs = [vec2, vec1];
 
-        let aa = run_point(&vec1, &vec2, lambda, false, true);
+        match run_point(&vec1, &vec2, lambda, false, true) {
+            Ok(aa) => {
+                if aa.len() == 16 {
+                    passed.push(event_id as i32 + 1);
+                    for hit in aa {
+                        let record = vec![
+                            (event_id + 1).to_string(),
+                            hit.6.to_string(),
+                            hit.0.to_string(),
+                            ATLAS_RADII_PIXEL[hit.0 as usize - 1].to_string(),
+                            hit.2.to_string(),
+                            hit.1.to_string(),
+                            vecs[hit.6 as usize - 1][0].to_string(),
+                            vecs[hit.6 as usize - 1][1].to_string(),
+                            vecs[hit.6 as usize - 1][2].to_string(),
+                            vecs[hit.6 as usize - 1][3].to_string(),
+                        ];
+                        buffer.push(record);
+                        if buffer.len() >= 10 {
+                            // Write buffered records to file
+                            for record in buffer.drain(..) {
+                                csv_writer.write_record(&record).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                continue;
+            }
+        }
 
         println!("Event ID: {}", event_id + 1);
         
@@ -44,32 +83,14 @@ pub fn process(lambda: f64, input_path_p: &str, input_path_a: &str, output_path:
         //         QID = AA[jj][6] - 1
         //         listhere = [EventID+1, layer+1, QID+1, r, phi, z, vecs[QID][0], vecs[QID][1], vecs[QID][2], vecs[QID][3]] # ensure the +1s are correct???
         //         data.append(listhere)
-        if aa.len() == 16 {
-            passed.push(event_id as i32 + 1);
-            for hit in aa {
-                let record = vec![
-                    (event_id + 1).to_string(),
-                    hit.0.to_string(),
-                    hit.6.to_string(),
-                    ATLAS_RADII_PIXEL[hit.0 as usize - 1].to_string(),
-                    hit.2.to_string(),
-                    hit.1.to_string(),
-                    vecs[hit.6 as usize - 1][0].to_string(),
-                    vecs[hit.6 as usize - 1][1].to_string(),
-                    vecs[hit.6 as usize - 1][2].to_string(),
-                    vecs[hit.6 as usize - 1][3].to_string(),
-                ];
-                data.push(record);
-            }
-        }
+        
+    }
+    
+    for record in buffer {
+        csv_writer.write_record(&record).unwrap();
     }
 
-    std::fs::create_dir_all(Path::new(output_path).parent().unwrap()).unwrap();
-    let mut wtr = WriterBuilder::new().from_path(output_path).unwrap();
-    for row in data {
-        wtr.write_record(&row).unwrap();
-    }
-    wtr.flush().unwrap();
+    csv_writer.flush().unwrap();
 
     passed
 }

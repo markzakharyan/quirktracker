@@ -3,6 +3,8 @@ use csv::WriterBuilder;
 use nalgebra::Vector4;
 use serde::Deserialize;
 use std::env;
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::Path;
 use std::time::Instant;
 
@@ -22,13 +24,19 @@ struct EventState {
 
 pub fn process(lambda: f64, passed: &Vec<i32>, input_path: &str, output_path: &str) {
     let mut input = csv::ReaderBuilder::new().has_headers(true).from_path(input_path).unwrap();
-
     let event_states: Vec<EventState> = input.deserialize().map(|result| result.unwrap()).collect();
 
-    let mut data: Vec<Vec<String>> = vec![
-        vec!["EventID", "TruthID", "PID", "Layer", "r[cm]", "phi", "z[cm]", "E[GeV]", "px[GeV]", "py[GeV]", "pz[GeV]"]
-            .iter().map(|&s| s.to_string()).collect(),
-    ];
+    // Create a buffered writer
+    std::fs::create_dir_all(Path::new(output_path).parent().unwrap()).unwrap();
+    let file = File::create(output_path).unwrap();
+    let mut wtr = BufWriter::new(file);
+
+    // Write headers
+    let headers = vec!["EventID", "TruthID", "PID", "Layer", "r[cm]", "phi", "z[cm]", "E[GeV]", "px[GeV]", "py[GeV]", "pz[GeV]"];
+    let mut csv_writer = csv::Writer::from_writer(&mut wtr);
+    csv_writer.write_record(&headers).unwrap();
+
+    let mut buffer: Vec<Vec<String>> = Vec::new();
 
     for (ii, event_state) in event_states.iter().enumerate().take(88860) {
 
@@ -36,83 +44,94 @@ pub fn process(lambda: f64, passed: &Vec<i32>, input_path: &str, output_path: &s
             continue;
         }
 
-        let vec1 = Vector4::new(event_state.E, event_state.px, event_state.py, event_state.pz);
-        let vec2 = vec1.clone();
+        let vec1: Vector4<f64> = Vector4::new(event_state.E, event_state.px, event_state.py, event_state.pz);
+        let vec2: Vector4<f64> = vec1.clone();
 
-        let truth_id = ii + 2;
+        let truth_id: usize = ii + 2;
 
         println!("truth id: {}", truth_id);
 
+        match run_point(&vec1, &vec2, lambda, false, false) {
+            Ok(aa) => {
 
-        // TODO: Investigate why program hangs at truth_id=383
-        let aa: Vec<(i32, f64, f64, f64, f64, f64, i32)> = run_point(&vec1, &vec2, lambda, false, false);
-
-        if aa.len() == 16 {
-            for i in 1..9 {
-                let select: usize;
-                if event_state.PID > 0.0 {
-                    select = 2 * (i - 1);
-                } else {
-                    select = 2 * i - 1;
+                if aa.len() == 16 {
+                    for i in 1..9 {
+                        let select: usize;
+                        if event_state.PID > 0.0 {
+                            select = 2 * (i - 1);
+                        } else {
+                            select = 2 * i - 1;
+                        }
+        
+                        let layer: i32 = aa[select].0;
+                        let r: f64 = ATLAS_RADII_PIXEL[(layer - 1) as usize];
+                        let z: f64 = aa[select].1;
+                        let phi: f64 = aa[select].2;
+        
+                        let record: Vec<String> = vec![
+                            // listhere = [EventID, TruthID, PID, layer, r, phi, z] + list(vecs[0])
+                            (event_state.event_id).to_string(),
+                            truth_id.to_string(),
+                            event_state.PID.to_string(),
+                            layer.to_string(),
+                            r.to_string(),
+                            phi.to_string(),
+                            z.to_string(),
+                            vec1[0].to_string(),
+                            vec1[1].to_string(),
+                            vec1[2].to_string(),
+                            vec1[3].to_string(),
+                        ];
+        
+                        buffer.push(record);
+        
+                        if phi.is_finite() && z.is_finite() {
+                            if buffer.len() >= 10 {
+                                // Write buffered records to file and clear the buffer
+                                for record in buffer.iter() {
+                                    csv_writer.write_record(record).unwrap();
+                                }
+                                buffer.clear();
+                            }
+                        }
+                    }
+                    
                 }
-
-                let layer = aa[select].0;
-                let r = ATLAS_RADII_PIXEL[(layer - 1) as usize];
-                let z = aa[select].1;
-                let phi = aa[select].2;
-
-                let record = vec![
-                    // listhere = [EventID, TruthID, PID, layer, r, phi, z] + list(vecs[0])
-                    (event_state.event_id).to_string(),
-                    truth_id.to_string(),
-                    event_state.PID.to_string(),
-                    layer.to_string(),
-                    r.to_string(),
-                    phi.to_string(),
-                    z.to_string(),
-                    vec1[0].to_string(),
-                    vec1[1].to_string(),
-                    vec1[2].to_string(),
-                    vec1[3].to_string(),
-                ];
-
-                if phi.is_finite() && z.is_finite() {
-                    data.push(record);
-                }
+        
+            },
+            Err(error) => {
+                continue; // or handle the error in an appropriate way
             }
-            
-        }
-
+        };
 
     }
 
-    std::fs::create_dir_all(Path::new(output_path).parent().unwrap()).unwrap();
-    let mut wtr = WriterBuilder::new().from_path(output_path).unwrap();
-    for row in data {
-        wtr.write_record(&row).unwrap();
+    for record in buffer {
+        csv_writer.write_record(&record).unwrap();
     }
-    wtr.flush().unwrap();
+
+    csv_writer.flush().unwrap();
 
 }
 
 pub fn _default_background() {
-    let lambda = 20.0;
+    let lambda: f64 = 20.0;
 
-    let current_directory = env::current_dir().unwrap();
+    let current_directory: std::path::PathBuf = env::current_dir().unwrap();
     
-    let input_path = format!("{}/4vector_pionbgd_wCuts.csv", current_directory.display());
-    let output_path = format!("{}/HitFiles/Bgd/Bgd_500_1jet_wCuts.csv", current_directory.display());
+    let input_path: String = format!("{}/4vector_pionbgd_wCuts.csv", current_directory.display());
+    let output_path: String = format!("{}/HitFiles/Bgd/Bgd_500_1jet_wCuts.csv", current_directory.display());
 
     // passed list provided here only for debugging purposes
     let passed: Vec<i32> = vec![3, 4, 10, 14, 15, 19, 20, 21, 26, 31, 32, 33, 40, 41, 43, 47, 50, 51, 52, 55, 56, 57, 58, 59, 61, 66, 67, 68, 69, 70, 79, 81, 82, 83, 87, 88, 94, 95, 98, 100, 103, 104, 105, 111, 113, 114, 116, 117, 118, 119, 127, 128, 131, 134, 136, 139, 140, 141, 142, 143, 144, 150, 152, 154, 155, 165, 166, 171, 173, 174, 176, 177, 178, 180, 181, 184, 186, 187, 188, 189, 192, 194, 195, 197, 198, 199, 203, 205, 208, 211, 212, 220, 222, 224, 228, 229, 234, 236, 237, 240];
 
+    let start_time: Instant = Instant::now();
 
-    let start_time = Instant::now();
-    let passed = process(lambda, &passed, &input_path, &output_path);
-    let duration = start_time.elapsed();
+    process(lambda, &passed, &input_path, &output_path);
+
+    let duration: std::time::Duration = start_time.elapsed();
 
     println!("(Rust Background Regular) Time taken: {:?} seconds", duration.as_secs_f32());
-    println!("passed: {:?}", passed);
 }
 
 // (Quirk Regular) Time taken: 53.58206 seconds

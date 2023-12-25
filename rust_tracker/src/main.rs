@@ -3,6 +3,7 @@ mod quirk;
 mod background;
 
 use clap::{App, Arg};
+use nalgebra::Vector4;
 use std::env;
 
 
@@ -87,10 +88,17 @@ fn main() {
         .unwrap_or_else(|| format!("{}/HitFiles/Bgd/Bgd_{}_1jet_wCuts_multiprocessed.csv", current_directory.display(), mass));
 
 
-// Here you can use the paths like this:
-// background_multiprocessing::process(&passed, &background_path_input, &background_path_output);
-
     let passed = quirk::process(lambda, &quirk_input_path_p, &quirk_input_path_a, &quirk_path_output);
     println!("passed: {:?}", passed);
     background::process(lambda, &passed, &background_path_input, &background_path_output);
+
+    // let vec1: Vector4<f64> = Vector4::<f64>::new(224.219,192.585,114.211,11.878);
+    // let aa: Vec<(i32, f64, f64, f64, f64, f64, i32)> = match knappen::run_point(&vec1, &vec1.clone(), 500.0, false, false) {
+        // Ok(aa) => aa,
+        // Err(e) => {
+            // println!("Error: {:?}", e);
+            // vec![]
+        // }
+    // };
+    // println!("{:?}", aa);
 }

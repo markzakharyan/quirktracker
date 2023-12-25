@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, f64::consts::PI};
+use std::{cmp::Ordering, f64::consts::PI, io::Error};
 // use rayon::prelude::*;
 // use std::sync::Mutex;
 // use ndarray::{Array1, Array2, ArrayBase, Data, Ix1};
@@ -252,7 +252,7 @@ fn find_tracks(
     root_sigma: f64,
     quirkflag: bool,
     b: &Vector3<f64>,
-) -> (Interpolator, Interpolator) {
+) -> Result<(Interpolator, Interpolator), Error> {
     let added: Vector4<f64> = vec1 + vec2;
 
     let m: f64 = (vec1.dot(&(ETA_ETA_MATRIX * vec1))).sqrt();
@@ -260,6 +260,14 @@ fn find_tracks(
     let t: f64 = (root_sigma * 1e-9).powi(2);
     let boost: Matrix4<f64> = lorentz(&added);
     let boost_back: Matrix4<f64> = lorentz(&(ETA_ETA_MATRIX * added));
+
+    for i in 0..4 {
+        for j in 0..4 {
+            if !boost[(i, j)].is_finite() || !boost_back[(i, j)].is_finite() || !m.is_finite() || !t.is_finite() {
+                return Err(Error::new(std::io::ErrorKind::Other, "NaN in FindTracks"));
+            }
+        }
+    }
 
     let vcm: Vector3<f64> = yzw(&added) / added.x;
 
@@ -334,17 +342,14 @@ fn find_tracks(
                 sol1_values.push(sol1);
             }
 
-            return (
+            return Ok((
                 Interpolator::new(time_points.to_owned(), sol0_values.to_owned()),
                 Interpolator::new(time_points.to_owned(), sol1_values.to_owned()),
-            );
+            ));
         }
         Err(_) => {
             println!("An error occured.");
-            return (
-                Interpolator::new(Vec::new(), Vec::new()),
-                Interpolator::new(Vec::new(), Vec::new()),
-            );
+            Err(Error::new(std::io::ErrorKind::Other, "An error occured integrating in FindTracks."))
         }
     }
 }
@@ -567,7 +572,7 @@ pub fn run_point(
     root_sigma: f64,
     plotflag: bool,
     quirkflag: bool,
-) -> Vec<(i32, f64, f64, f64, f64, f64, i32)> {
+) -> Result<Vec<(i32, f64, f64, f64, f64, f64, i32)>, Error> {
     let find_edges1: Vec<f64> = find_edges(vec1, vec2, root_sigma, 1);
     let find_edges2: Vec<f64> = find_edges(vec1, vec2, root_sigma, 2);
 
@@ -586,20 +591,14 @@ pub fn run_point(
                 .unwrap()
                 < ATLAS_Z_RANGE[1])
     {
-        let (sol_1, sol2) = find_tracks(
-            vec1,
-            vec2,
-            root_sigma,
-            quirkflag,
-            &Vector3::new(0.0, 0.0, 1.18314e-16),
-        );
+        match find_tracks(vec1, vec2, root_sigma, quirkflag, &Vector3::new(0.0, 0.0, 1.18314e-16)) {
+            Ok((sol_1, sol2)) => {
+                if plotflag {}
 
-        if plotflag {}
-
-        let intersections1 = find_intersections(&sol_1);
-        let intersections2 = find_intersections(&sol2);
-
-        let mut combined_intersections: Vec<(i32, f64, f64, f64, f64, f64, i32)> = intersections1
+                let intersections1 = find_intersections(&sol_1);
+                let intersections2 = find_intersections(&sol2);
+                // Rest of the code...
+                let mut combined_intersections: Vec<(i32, f64, f64, f64, f64, f64, i32)> = intersections1
             .iter()
             .map(|&(a, b, c, d, e, f)| (a, b, c, d, e, f, 1))
             .chain(
@@ -612,9 +611,19 @@ pub fn run_point(
         combined_intersections
             .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        return combined_intersections;
+        return Ok(combined_intersections);
+            }
+            Err(err) => {
+                // Handle the error case if needed
+                println!("Error: {:?}", err);
+                // Return an appropriate value or propagate the error
+                return Err(err);
+            }
+        }
+
+        
     }
-    return Vec::new();
+    return Err(Error::new(std::io::ErrorKind::Other, "An error occured in run_point."));
 }
 
 // fn main() {
