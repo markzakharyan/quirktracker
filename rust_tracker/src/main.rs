@@ -85,7 +85,7 @@ fn main() {
 
     let background_path_output = matches.value_of("background_path_output")
         .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("{}/HitFiles/Bgd/Bgd_{}_1jet_wCuts_multiprocessed.csv", current_directory.display(), mass));
+        .unwrap_or_else(|| format!("{}/HitFiles/Bgd/Bgd_{}_1jet_wCuts.csv", current_directory.display(), mass));
 
 
     let passed = quirk::process(lambda, &quirk_input_path_p, &quirk_input_path_a, &quirk_path_output);
