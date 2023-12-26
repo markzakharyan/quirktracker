@@ -3,7 +3,7 @@ use std::{cmp::Ordering, f64::consts::PI, io::Error};
 // use std::sync::Mutex;
 // use ndarray::{Array1, Array2, ArrayBase, Data, Ix1};
 use nalgebra::{Matrix4, Vector2};
-use ode_solvers::{Rk4, SVector, System, Vector3, Vector4}; //, dop853::Dop853
+use ode_solvers::{Rk4, SVector, System, Vector3, Vector4, Dop853}; //, dop853::Dop853
 use roots::{find_root_brent, SimpleConvergency};
 
 const ETA_ETA_MATRIX: Matrix4<f64> = Matrix4::new(
@@ -165,6 +165,7 @@ fn lorentz(p4: &Vector4<f64>) -> Matrix4<f64> {
     )
 }
 
+
 fn yzw(p4: &Vector4<f64>) -> Vector3<f64> {
     Vector3::new(p4.y, p4.z, p4.w)
 }
@@ -305,16 +306,18 @@ fn find_tracks(
     let num_steps = 10000000;
     let step_size = total_time / (num_steps as f64); // Approximate step size
 
-    // let mut stepper = Dop853::new(system, 0.1, 10e19, step_size, y0, 1.0e-5, 1.0e-5);
 
     let event_fn: Box<dyn Fn(Time, &State, &Matrix4<f64>) -> bool> = Box::new(
         |time, state, boost_back| {
             let mult_vec: Vector4<f64> = Vector4::new(INV_GEV_IN_SEC, INV_GEV_IN_CM, INV_GEV_IN_CM, INV_GEV_IN_CM);
             let sumx12: Vector3<f64> = state.fixed_rows::<3>(6).into_owned() + state.fixed_rows::<3>(9).into_owned();
             let norm: f64 = (yzw(&mult_vec.component_mul(&(boost_back * Vector4::new(time, sumx12.x, sumx12.y, sumx12.z))))).norm();
+            // println!("norm: {:}", norm);
             norm > 60.0
         },
     );
+
+    // let mut stepper = Dop853::new(system, 0.1, 10e19, step_size, y0, 1e-5, 1e12, boost_back).with_event_fn(event_fn);
 
     let mut stepper = Rk4::new(system, 0.1, y0, total_time, step_size, boost_back).with_event_fn(event_fn);
 
@@ -462,12 +465,22 @@ impl Interpolator {
         if n == 0 {
             return Vector4::new(0.0, 0.0, 0.0, 0.0);
         }
-        if t_value <= self.t[0] {
+        if n == 1 {
             return self.y[0];
         }
-        if t_value >= self.t[n - 1] {
-            return self.y[n - 1];
+
+        if t_value <= self.t[0] {
+            // Linear extrapolation using the first two points
+            let slope = (self.y[1] - self.y[0]) / (self.t[1] - self.t[0]);
+            return self.y[0] + slope * (t_value - self.t[0]);
         }
+
+        if t_value >= self.t[n - 1] {
+            // Linear extrapolation using the last two points
+            let slope = (self.y[n - 1] - self.y[n - 2]) / (self.t[n - 1] - self.t[n - 2]);
+            return self.y[n - 1] + slope * (t_value - self.t[n - 1]);
+        }
+
         for i in 0..n - 1 {
             if self.t[i] <= t_value && t_value <= self.t[i + 1] {
                 let t0 = self.t[i];
@@ -478,9 +491,12 @@ impl Interpolator {
                 return y0 * (1.0 - factor) + y1 * factor;
             }
         }
-        self.y[n - 1] // Fallback, should not reach here if t is sorted
+
+        // Fallback, should not reach here if t is sorted
+        self.y[n - 1]
     }
 }
+
 fn beta_beta(traj_map: &Interpolator, t0: f64) -> f64 {
     // return ((np.linalg.norm(trajMap([t0 + epsilon])[0][1:4]) - np.linalg.norm(trajMap([t0])[0][1:4])) / (trajMap([t0 + epsilon])[0][0] - trajMap([t0])[0][0])) / (3 * 10**10)
 
@@ -551,7 +567,7 @@ fn find_intersections(traj: &Interpolator) -> Vec<(i32, f64, f64, f64, f64, f64)
 
                 final_list.push((
                     (layer + 1) as i32,
-                    (z / z_size_layer).round() * z_size_layer,
+                    (z / Z_SIZE[1]).round() * Z_SIZE[1],
                     (phi / phi_size_layer).round() * phi_size_layer,
                     de(gamma, DELTA_R[layer]),
                     beta.abs() * gamma,

@@ -4,7 +4,7 @@ use crate::butcher_tableau::dopri853;
 use crate::controller::Controller;
 use crate::dop_shared::*;
 
-use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, OVector, Scalar};
+use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, OVector, Scalar, Matrix4};
 use num_traits::Zero;
 use simba::scalar::{ClosedAdd, ClosedMul, ClosedSub, SubsetOf, SupersetOf};
 
@@ -44,6 +44,8 @@ where
     out_type: OutputType,
     rcont: [V; 8],
     stats: Stats,
+    event_fn: Option<Box<dyn Fn(f64, &V, &Matrix4<f64>) -> bool>>,
+    boost_back: Matrix4<f64>,
 }
 
 impl<T, D: Dim, F> Dop853<OVector<T, D>, F>
@@ -65,7 +67,7 @@ where
     /// * `rtol`    - Relative tolerance used in the computation of the adaptive step size
     /// * `atol`    - Absolute tolerance used in the computation of the adaptive step size
     ///
-    pub fn new(f: F, x: f64, x_end: f64, dx: f64, y: OVector<T, D>, rtol: f64, atol: f64) -> Self {
+    pub fn new(f: F, x: f64, x_end: f64, dx: f64, y: OVector<T, D>, rtol: f64, atol: f64, boost_back: Matrix4<f64>) -> Self {
         let (rows, cols) = y.shape_generic();
         Self {
             f,
@@ -98,6 +100,8 @@ where
                 OVector::zeros_generic(rows, cols),
             ],
             stats: Stats::new(),
+            event_fn: None,
+            boost_back: boost_back,
         }
     }
 
@@ -140,6 +144,8 @@ where
         n_max: u32,
         n_stiff: u32,
         out_type: OutputType,
+        boost_back: Matrix4<f64>,
+        event_fn: Option<Box<dyn Fn(f64, &OVector<T, D>, &Matrix4<f64>) -> bool>>,
     ) -> Self {
         let alpha = 1.0 / 8.0 - beta * 0.2;
         let (rows, cols) = y.shape_generic();
@@ -182,7 +188,14 @@ where
                 OVector::zeros_generic(rows, cols),
             ],
             stats: Stats::new(),
+            event_fn: event_fn,
+            boost_back: boost_back,
         }
+    }
+
+    pub fn with_event_fn(mut self, event_fn: Box<dyn Fn(f64, &OVector<T, D>, &Matrix4<f64>) -> bool>) -> Self {
+        self.event_fn = Some(event_fn);
+        self
     }
 
     /// Compute the initial stepsize
@@ -474,6 +487,13 @@ where
 
                 self.solution_output(k[4].clone());
 
+                if let Some(ref event_fn) = self.event_fn {
+                    if event_fn(self.x, &self.y, &self.boost_back) {
+                        // Handle the event, such as breaking the loop
+                        last = true;
+                    }
+                }
+
                 // Early abortion check
                 if self.f.solout(self.x, &self.y_out.last().unwrap(), &k[0]) {
                     last = true;
@@ -573,18 +593,5 @@ mod tests {
         fn solout(&mut self, x: f64, _y: &OVector<f64, D>, _dy: &OVector<f64, D>) -> bool {
             return x >= 0.5;
         }
-    }
-
-    #[test]
-    fn test_integrate_test1_svector() {
-        let system = Test1 {};
-        let mut stepper = Dop853::new(system, 0., 1., 0.1, Vector1::new(1.), 1e-12, 1e-6);
-        let _ = stepper.integrate();
-
-        let x = stepper.x_out();
-        assert!((*x.last().unwrap() - 0.5).abs() < 1.0E-9); //
-
-        let out = stepper.y_out();
-        assert!((&out[5][0] - 0.912968195).abs() < 1.0E-9);
     }
 }

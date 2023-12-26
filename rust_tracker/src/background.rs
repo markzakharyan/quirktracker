@@ -1,5 +1,4 @@
 use crate::knappen::{run_point, ATLAS_RADII_PIXEL};
-use csv::WriterBuilder;
 use nalgebra::Vector4;
 use serde::Deserialize;
 use std::env;
@@ -37,6 +36,8 @@ pub fn process(lambda: f64, passed: &Vec<i32>, input_path: &str, output_path: &s
     csv_writer.write_record(&headers).unwrap();
 
     let mut buffer: Vec<Vec<String>> = Vec::new();
+
+    let mut total_oopsies: i32 = 0;
 
     for (ii, event_state) in event_states.iter().enumerate().take(88860) {
 
@@ -99,7 +100,8 @@ pub fn process(lambda: f64, passed: &Vec<i32>, input_path: &str, output_path: &s
                 }
         
             },
-            Err(error) => {
+            Err(_error) => {
+                total_oopsies += 1;
                 continue; // or handle the error in an appropriate way
             }
         };
@@ -111,6 +113,8 @@ pub fn process(lambda: f64, passed: &Vec<i32>, input_path: &str, output_path: &s
     }
 
     csv_writer.flush().unwrap();
+
+    println!("Total oopsies: {}", total_oopsies);
 
 }
 
