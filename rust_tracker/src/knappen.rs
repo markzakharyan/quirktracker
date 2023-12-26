@@ -112,16 +112,14 @@ fn delta_p_pdg(x: f64, gamma: f64, z: f64) -> f64 {
     //              beta(gamma)**2 - Delta(eta(gamma), Si) + 0.2)
     
 
-    let beta_gamma = beta(gamma);
-    let eta_gamma = eta(gamma);
-    let delta_eta_gamma = delta(eta_gamma);
-
-    let part1 = 1.0 * RHO_SI * 4.0 * PI * NA * RE.powi(2) * ME * z.powi(2) * 0.5 * (Z_SI as f64) * x;
-    let part2 = part1 / (A_SI * beta_gamma.powi(2));
-    let log_term = (2.0 * ME * eta_gamma.powi(2) / (EV2GEV * STERNHEIMER_I_SI)).ln();
-    let log_term2 = part2 / (EV2GEV * STERNHEIMER_I_SI);
-
-    let output = part2 * (log_term + log_term2.ln() - beta_gamma.powi(2) - delta_eta_gamma + 0.2);
+    let output: f64 = 1.0 * RHO_SI * 4.0 * PI * NA * RE.powi(2) * ME * z.powi(2) * 0.5 * (Z_SI as f64) * x / 
+                 (A_SI * beta(gamma).powi(2)) * (
+                 (2.0 * ME * eta(gamma).powi(2) / (EV2GEV * STERNHEIMER_I_SI)).ln() + 
+                 ((1.0 * RHO_SI * 4.0 * PI * NA * RE.powi(2) * ME * z.powi(2) * 
+                   0.5 * (Z_SI as f64) * x / (A_SI * beta(gamma).powi(2)) / 
+                   (EV2GEV * STERNHEIMER_I_SI)).ln()) - 
+                 beta(gamma).powi(2) - delta(eta(gamma)) + 0.2
+                 );
 
     // println!("{:}", output);
     output
