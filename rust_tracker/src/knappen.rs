@@ -5,6 +5,10 @@ use std::{cmp::Ordering, f64::consts::PI, io::Error};
 use nalgebra::{Matrix4, Vector2};
 use ode_solvers::{Rk4, SVector, System, Vector3, Vector4, Dop853}; //, dop853::Dop853
 use roots::{find_root_brent, SimpleConvergency};
+use plotters::prelude::*;
+use plotters::style::ShapeStyle;
+
+
 
 const ETA_ETA_MATRIX: Matrix4<f64> = Matrix4::new(
     1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0,
@@ -313,7 +317,7 @@ fn find_tracks(
             let sumx12: Vector3<f64> = state.fixed_rows::<3>(6).into_owned() + state.fixed_rows::<3>(9).into_owned();
             let norm: f64 = (yzw(&mult_vec.component_mul(&(boost_back * Vector4::new(time, sumx12.x, sumx12.y, sumx12.z))))).norm();
             // println!("norm: {:}", norm);
-            norm > 60.0
+            norm > 80.0
         },
     );
 
@@ -580,6 +584,65 @@ fn find_intersections(traj: &Interpolator) -> Vec<(i32, f64, f64, f64, f64, f64)
     final_list
 }
 
+
+fn plot_trajectories(sol1: &Interpolator, sol2: &Interpolator) -> Result<(), Box<dyn std::error::Error>> {
+    // Extracting trajectory data
+    let sol1_points: Vec<(f64, f64)> = sol1.y.iter().map(|p| (p[1], p[2])).collect();
+    let sol2_points: Vec<(f64, f64)> = sol2.y.iter().map(|p| (p[1], p[2])).collect();
+
+    let rad = *ATLAS_RADII_PIXEL.last().unwrap_or(&0.0);
+    let x_range = (-rad - 5.0, rad + 5.0);
+    let y_range = (-rad - 5.0, rad + 5.0);
+
+    let root_area = BitMapBackend::new("plot.png", (800, 800)).into_drawing_area();
+    root_area.fill(&WHITE)?;
+
+    let mut chart = ChartBuilder::on(&root_area)
+        .x_label_area_size(40)
+        .y_label_area_size(40)
+        .margin(5)
+        .build_cartesian_2d(x_range.0..x_range.1, y_range.0..y_range.1)?;
+
+    chart.configure_mesh().draw()?;
+
+    chart
+        .draw_series(LineSeries::new(
+            sol1_points.into_iter(),
+            BLUE.stroke_width(1),
+        ))?
+        .label("Solution 1")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+
+    chart
+        .draw_series(LineSeries::new(
+            sol2_points.into_iter(),
+            RED.stroke_width(1),
+        ))?
+        .label("Solution 2")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+
+        for &radius in &ATLAS_RADII_PIXEL {
+            let num_points = 3600; // Increase the number of points for a smoother circle
+            let circle_data: Vec<(f64, f64)> = (0..num_points)
+                .map(|i| {
+                    let angle = i as f64 * std::f64::consts::PI * 2.0 / num_points as f64;
+                    (radius * angle.cos(), radius * angle.sin())
+                })
+                .collect();
+        
+            chart.draw_series(LineSeries::new(circle_data.into_iter(), &BLACK))?;
+        }
+
+    chart
+        .configure_series_labels()
+        .position(SeriesLabelPosition::UpperLeft)
+        // .background_style(&WHITE.mix(0.8))
+        .border_style(&BLACK)
+        .draw()?;
+
+    Ok(())
+}
+
 pub fn run_point(
     vec1: &Vector4<f64>,
     vec2: &Vector4<f64>,
@@ -606,10 +669,14 @@ pub fn run_point(
                 < ATLAS_Z_RANGE[1])
     {
         match find_tracks(vec1, vec2, root_sigma, quirkflag, &Vector3::new(0.0, 0.0, 1.18314e-16)) {
-            Ok((sol_1, sol2)) => {
-                if plotflag {}
+            Ok((sol1, sol2)) => {
+                if plotflag {
+                    if let Err(e) = plot_trajectories(&sol1, &sol2) {
+                        println!("Error plotting trajectories: {:?}", e);
+                    }
+                }
 
-                let intersections1 = find_intersections(&sol_1);
+                let intersections1 = find_intersections(&sol1);
                 let intersections2 = find_intersections(&sol2);
                 // Rest of the code...
                 let mut combined_intersections: Vec<(i32, f64, f64, f64, f64, f64, i32)> = intersections1
@@ -644,7 +711,7 @@ pub fn run_point(
 //     let vec1: Vector4<f64> = Vector4::new(421.69956147, 258.12146064, 154.10248991, -254.86516886);
 //     let vec2: Vector4<f64> = Vector4::new(202.65928421, -123.22431566, 12.442253162, 56.848428683);
 
-//     let aa = run_point(&vec1, &vec2, 500.0, false, true);
+//     let aa = run_point(&vec1, &vec2, 500.0, true, true);
 //     println!("{:?}", aa);
 // }
 
